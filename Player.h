@@ -23,6 +23,7 @@ class Player
         Player(int team, int tablePosition, int partnerTablePosition);
         void dealCard(Card& card);
         Card playCard(Suit leadSuit, Suit trumpSuit, std::unordered_map<Player, Card, PlayerHasher, PlayerComparator>& trick);
+        std::pair<bool, int> selectBid(bool bidOptions[], int numBidOptions);
         
         int getTablePosition() const { return tablePosition; }
         int getPartnerTablePosition() const { return partnerTablePosition; }

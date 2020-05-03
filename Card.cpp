@@ -17,6 +17,24 @@ std::vector<Suit> const Card::getPossibleCardSuits() {
     return suits;
 }
 
+std::string const Card::getSuitString(Suit suit) {
+    switch(suit) {
+        case clubs:
+            return "Clubs";
+        case diamonds:
+            return "Diamonds";
+        case hearts:
+            return "Hearts";
+        case spades:
+            return "Spades";
+        case none:
+            return "No Trump";
+        default:
+            std::cerr << "Invalid suit: " << std::to_string(suit) << "\n";
+            throw 0;
+    }
+}
+
 std::vector<Rank> const Card::getPossibleCardRanks() {
     std::vector<Rank> ranks;
     ranks.push_back(two);
@@ -34,4 +52,46 @@ std::vector<Rank> const Card::getPossibleCardRanks() {
     ranks.push_back(ace);
     
     return ranks;
+}
+
+std::string const Card::getRankString(Rank rank) {
+    switch(rank) {
+        case two:
+            return "2";
+        case three:
+            return "3";
+        case four:
+            return "4";
+        case five:
+            return "5";
+        case six:
+            return "6";
+        case seven:
+            return "7";
+        case eight:
+            return "8";
+        case nine:
+            return "9";
+        case ten:
+            return "10";
+        case jack:
+            return "Jack";
+        case queen:
+            return "Queen";
+        case king:
+            return "King";
+        case ace:
+            return "Ace";
+        default:
+            std::cerr << "Invalid rank: " << std::to_string(rank) << "\n";
+            throw 0;
+    }
+}
+
+std::string const Card::getString(Suit suit, Rank rank) {
+    return getRankString(rank) + " of " + getSuitString(suit);
+}
+
+std::string const Card::getString() {
+    return getString(suit, rank);
 }

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "Player.h"
 #include "Deck.h"
@@ -14,8 +15,14 @@ class Table
         std::unordered_map<int, int> teamScores;
         std::unordered_map<int, int> teamTricks;
         Deck* deck;
-        Suit trumpSuit = none;
+        Suit trumpSuit;
+        int bidTarget;
         int dealer = 0;
+        int declarer;
+        int dummy;
+        
+        bool debugMode = false;
+        std::unordered_set<Card, CardHasher, CardComparator> debugCardsPlayed;
         
         std::pair<int,int> playTrick(int startingPlayer);
         const Player& determineTrickWinner(std::unordered_map<Player, Card, PlayerHasher, PlayerComparator>& trick, Suit leadSuit, Suit trumpSuit);
@@ -23,9 +30,10 @@ class Table
         
     
     public:
-        Table();
+        Table(bool debugMode);
         //~Table();  TODO
-        void deal();
+        void deal(int dealer);
+        bool bid();
         void play();
         std::vector<Player>& getPlayers() { return players; }
         std::unordered_map<int, int>& getTeamScores() { return teamScores; }

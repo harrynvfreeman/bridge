@@ -26,7 +26,7 @@ void Player::dealCard(Card& card) {
 Card Player::playCard(Suit leadSuit, Suit trumpSuit, std::unordered_map<Player, Card, PlayerHasher, PlayerComparator>& trick) {
     std::vector<Card> allowableCards;
     allowableCards.reserve(deckSize);
-    std::cerr << "Lead Suit is " << leadSuit << ".\n";
+    
     if (hand[leadSuit].size() > 0) {
         for (auto card : hand[leadSuit]) {
             allowableCards.push_back(card);
@@ -38,15 +38,33 @@ Card Player::playCard(Suit leadSuit, Suit trumpSuit, std::unordered_map<Player, 
             }
         }
     }
-    std::cerr << "Allowable Cards is " << allowableCards.size() << ".\n";
+    
     Card cardToPlay = selectCard(allowableCards, trumpSuit, trick);
     hand[cardToPlay.getSuit()].erase(cardToPlay);
     return cardToPlay;
 }
 
 Card Player::selectCard(std::vector<Card>& allowableCards, Suit trumpSuit, std::unordered_map<Player, Card, PlayerHasher, PlayerComparator>& trick) {
-    return allowableCards.at(0);
+    int index = rand() % allowableCards.size();
+    return allowableCards.at(index);
 }
 //TODO MAKE THIS SMARTER
 //TODO Actually make deck a set? Idk if it matters.  Actaully probably doesn't.
 //TODO add checking for trickWinner to make sure there are 4 cards in trick
+
+//bool for should I bid
+//int for what bid would be
+//make sure int returned is random if bool is false
+std::pair<bool, int> Player::selectBid(bool bidOptions[], int numBidOptions) {   
+    bool shouldBid = (bool)(rand() % 2);
+    int bid = rand() % numBidOptions;
+    int count = 0;
+    while (bidOptions[bid] == false && count < 1000) {
+        bid = rand() % numBidOptions;
+        count++;
+    }
+    if (count == 1000) {
+        shouldBid = false;
+    }
+    return std::make_pair(shouldBid, bid);
+}

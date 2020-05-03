@@ -15,10 +15,16 @@ int main()
     //    std::cout << card.getRank() << " of " << card.getSuit() << "\n";
     //}
     
-    Table table = Table();
-    table.deal();
-    table.play();
-    
+    try {
+        Table table = Table(true);
+        table.deal(0);
+        //table.bid();
+        if (table.bid()) {
+            table.play();
+        }
+    } catch( int e ) {
+        std::cerr << e << "\n";
+    }
     return 0;
 }
 

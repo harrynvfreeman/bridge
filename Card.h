@@ -4,7 +4,7 @@
 #include <vector>
 
 const int deckSize = 52;
-const int numSuits = 4;
+//const int numSuits = 4;
 const int numRanks = 13;
 const int handSize = 13;
 
@@ -49,6 +49,15 @@ class Card
         static std::vector<Suit> const getPossibleCardSuits();
         
         static std::vector<Rank> const getPossibleCardRanks();
+        
+        static std::string const getSuitString(Suit suit);
+        
+        static std::string const getRankString(Rank rank);
+        
+        static std::string const getString(Suit suit, Rank rank);
+        
+        std::string const getString();
+        
 };
 
 struct CardHasher
