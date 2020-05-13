@@ -1,27 +1,27 @@
 #ifndef CARD_H
 #define CARD_H
 
+#include <string>
 #include <vector>
 
 const int deckSize = 52;
-//const int numSuits = 4;
 const int numRanks = 13;
 const int handSize = 13;
 
 enum Rank {
-    two = 0,
-    three = 1,
-    four = 2,
-    five = 3,
-    six = 4,
-    seven = 5,
-    eight = 6,
-    nine = 7,
-    ten = 8,
-    jack = 9,
-    queen = 10,
-    king = 11,
-    ace = 12
+    two = 2,
+    three = 3,
+    four = 4,
+    five = 5,
+    six = 6,
+    seven = 7,
+    eight = 8,
+    nine = 9,
+    ten = 10,
+    jack = 11,
+    queen = 12,
+    king = 13,
+    ace = 14
 };
 
 enum Suit
@@ -57,6 +57,8 @@ class Card
         static std::string const getString(Suit suit, Rank rank);
         
         std::string const getString();
+        
+        static int ddsSuitConvert(Suit suit);
         
 };
 

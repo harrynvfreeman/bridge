@@ -68,3 +68,12 @@ std::pair<bool, int> Player::selectBid(bool bidOptions[], int numBidOptions) {
     }
     return std::make_pair(shouldBid, bid);
 }
+
+unsigned int Player::getHandEncoding(Suit suit) {
+    unsigned int encoding = 0;
+    for (auto card : hand.at(suit)) {
+        encoding = encoding + (1 << card.getRank());
+    }
+    
+    return encoding;
+}

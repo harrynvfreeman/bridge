@@ -35,6 +35,24 @@ std::string const Card::getSuitString(Suit suit) {
     }
 }
 
+int Card::ddsSuitConvert(Suit suit) {
+    switch(suit) {
+        case clubs:
+            return 3;
+        case diamonds:
+            return 2;
+        case hearts:
+            return 1;
+        case spades:
+            return 0;
+        case none:
+            return 4;
+        default:
+            std::cerr << "Invalid suit to convert: " << std::to_string(suit) << "\n";
+            throw 0;
+    }
+}
+
 std::vector<Rank> const Card::getPossibleCardRanks() {
     std::vector<Rank> ranks;
     ranks.push_back(two);

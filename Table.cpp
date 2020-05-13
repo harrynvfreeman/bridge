@@ -5,7 +5,6 @@
 #include "Card.h"
 #include "Table.h"
 
-const int numPlayers = 4;
 const int numTeams = 2;
 const int bidRanks = 7;
 const int bidSuits = 5;
@@ -24,6 +23,8 @@ Table::Table(bool debugMode) {
     teamScores.insert(std::make_pair(1, 0));
     teamTricks.insert(std::make_pair(0, 0));
     teamTricks.insert(std::make_pair(1, 0));
+    
+    dealer = 0;
     
     this->debugMode = debugMode;
     

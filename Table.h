@@ -8,6 +8,8 @@
 #include "Player.h"
 #include "Deck.h"
 
+const int numPlayers = 4;
+
 class Table
 {
     private:
@@ -17,11 +19,11 @@ class Table
         Deck* deck;
         Suit trumpSuit;
         int bidTarget;
-        int dealer = 0;
+        int dealer;
         int declarer;
         int dummy;
         
-        bool debugMode = false;
+        bool debugMode;
         std::unordered_set<Card, CardHasher, CardComparator> debugCardsPlayed;
         
         std::pair<int,int> playTrick(int startingPlayer);

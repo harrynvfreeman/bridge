@@ -11,7 +11,7 @@ struct PlayerComparator;
 class Player
 {
     private:
-        std::unordered_map<int, std::unordered_set<Card, CardHasher, CardComparator>> hand;
+        std::unordered_map<int, std::unordered_set<Card, CardHasher, CardComparator> > hand;
         int team;
         int tablePosition;
         int partnerTablePosition;
@@ -29,7 +29,9 @@ class Player
         int getPartnerTablePosition() const { return partnerTablePosition; }
         int getTeam() const { return team; }
         
-        std::unordered_map<int, std::unordered_set<Card, CardHasher, CardComparator>>& getHand() { return hand; }
+        std::unordered_map<int, std::unordered_set<Card, CardHasher, CardComparator> >& getHand() { return hand; }
+        
+        unsigned int getHandEncoding(Suit suit);
 };
 
 struct PlayerHasher
