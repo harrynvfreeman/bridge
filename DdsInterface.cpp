@@ -2,36 +2,48 @@
 #include "DdsInterface.h"
 #include "./include/dll.h"
 #include "Card.h"
+#include "Utils.h"
 
-//g++ -o DdsInterface.so -shared -fPIC DdsInterface.cpp -L. -ldds
+//g++ -o DdsInterface.so -shared -fPIC DdsInterface.cpp Utils.cpp -L. -ldds
 
 void convertHand(int * hand, int position, ddTableDeal * tableDeal);
 
-int numTricks(int bidSuit, int declarer, int* hand0, int* hand1, int* hand2, int* hand3) {
-    
-    #if defined(__linux) || defined(__APPLE__)
+void initialize() {
+    #if (defined(__linux) || defined(__APPLE__))
         SetMaxThreads(0);
     #endif
+}
+
+int calcScore(int bidSuit, int bidRank, int declarer, int isDoubled, int vulnerable, int* hand0, int* hand1, int* hand2, int* hand3) {
+    int numTricksWon = numTricks(bidSuit, declarer, hand0, hand1, hand2, hand3);
     
+    if (numTricksWon == -1) {
+        return -1;
+    }
+    
+    return calcDuplicateScore(bidSuit, bidRank, numTricksWon, isDoubled, vulnerable);
+}
+
+int numTricks(int bidSuit, int declarer, int* hand0, int* hand1, int* hand2, int* hand3) {
     ddTableDeal tableDeal;
     ddTableResults tableResults;
     int res;
-    
+
     convertHand(hand0, 0, &tableDeal);
     convertHand(hand1, 1, &tableDeal);
     convertHand(hand2, 2, &tableDeal);
     convertHand(hand3, 3, &tableDeal);
-    
+
     res = CalcDDtable(tableDeal, &tableResults);
-    
+
     if (res != RETURN_NO_FAULT)
     {
       printf("DDS error\n");
       return -1;
     }
-    
+
     int ddsBidSuit = bidSuit == 4 ? bidSuit : 3 - bidSuit;
-    
+
     return tableResults.resTable[ddsBidSuit][declarer];
 }
 

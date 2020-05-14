@@ -8,4 +8,6 @@ def custom_loss_function(y_true, y_pred):
 
     loss = -kb.mean(kl.multiply([y_true, kb.log(y_pred)]))
     
+    #loss = y_true
+    
     return loss

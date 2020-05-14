@@ -59,7 +59,7 @@ class Card
         std::string const getString();
         
         static int ddsSuitConvert(Suit suit);
-        
+                
 };
 
 struct CardHasher
