@@ -5,7 +5,10 @@ from pickle import dump, load
 import os
 import ctypes
 import pathlib
+import keras.backend as kb
+import keras.layers as kl
 from loss import custom_loss_function
+from keras.optimizers import SGD
 
 deckSize = 52
 vulnSize = 2
@@ -30,6 +33,7 @@ blockSize = 9
 numBidSuits = 5
 
 miniBatchSize = 100
+modelUpdateNum = 40
 
 rng = np.random.default_rng()
 
@@ -60,16 +64,6 @@ def updateEnnModel(ennModel):
     ennVersion = ennVersion + 1
     ennModel.save(ennSavePath + str(ennVersion) + '.h5')
     dump(ennVersion, open(ennVersionPath, 'wb'))
-    
-def randomlySelectEnnModel():
-    ennVersion = load(open(ennVersionPath, 'rb'))
-    if ennVersion >= numModelsToSave:
-        randVersion = np.random.randint(ennVersion - numModelsToSave + 1, ennVersion)
-    else:
-        randVersion = np.random.randint(0, ennVersion + 1)
-        
-    modelPath =ennSavePath + str(randVersion) + '.h5'
-    return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
 
 def loadTargetEnnModel():
     ennVersion = load(open(ennVersionPath, 'rb'))
@@ -85,21 +79,23 @@ def updatePnnModel(pnnModel):
     pnnModel.save(pnnSavePath + str(pnnVersion) + '.h5')
     dump(pnnVersion, open(pnnVersionPath, 'wb'))
 
-def randomlySelectPnnModel():
-    pnnVersion = load(open(pnnVersionPath, 'rb'))
-    if pnnVersion >= numModelsToSave:
-        randVersion = np.random.randint(pnnVersion - numModelsToSave + 1, pnnVersion)
-    else:
-        randVersion = np.random.randint(0, pnnVersion + 1)
-        
-    modelPath =pnnSavePath + str(randVersion) + '.h5'
-    return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
-
 def loadTargetPnnModel():
     pnnVersion = load(open(pnnVersionPath, 'rb'))
     modelPath = pnnSavePath + str(pnnVersion) + '.h5'
     return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
-    
+
+def randomlySelectModels():
+    version = load(open(ennVersionPath, 'rb'))
+    if version >= numModelsToSave:
+        randVersion = np.random.randint(version - numModelsToSave + 1, version)
+    else:
+        randVersion = np.random.randint(0, version + 1)
+        
+    ennModelPath = ennSavePath + str(randVersion) + '.h5'
+    pnnModelPath = pnnSavePath + str(randVersion) + '.h5'
+    ennModel = keras.models.load_model(ennModelPath, custom_objects={'custom_loss_function': custom_loss_function})
+    pnnModel = keras.models.load_model(pnnModelPath, custom_objects={'custom_loss_function': custom_loss_function})
+    return ennModel, pnnModel
 
 #Step 1 is generating random games
 def generateRandomGame():
@@ -126,60 +122,93 @@ def selfPlay(decks, vulnerables, dealers):
     numMiniBatches = decks.shape[0] // miniBatchSize
     
     targetEnnModel = loadTargetEnnModel()
+    
+    targetEnnModel.compile(optimizer=SGD(lr=0.1), loss='binary_crossentropy')
+    
     targetPnnModel = loadTargetPnnModel()
     
+    targetPnnModel.compile(optimizer=SGD(lr=0.1, clipnorm=2), loss=custom_loss_function)
+    
+    opponentEnnModel, opponentPnnModel = randomlySelectModels()
+    #opponentEnnModel = loadTargetEnnModel()
+    #opponentPnnModel = loadTargetPnnModel()
+    
+    #numMiniBatches
     for i in range(numMiniBatches):
         
-        opponentEnnModel = randomlySelectEnnModel()
-        opponentPnnModel = randomlySelectPnnModel()
-        
         #pnn
-        rValues = []
+        pnnRewards = []
         pnnInputValues = []
         
         #enn
         cardValues = []
         ennInputValues = []
         
+        #miniBatchSize
         for j in range(miniBatchSize):
             index = i*miniBatchSize + j
             deck = decks[index]
             vulnerable = vulnerables[index]
             dealer = dealers[index, 0]
-            
+            #print("Dealer is: " + str(dealer))
             for pos in range(2):
-                hbid, declarer, isDoubled, hands, ennInputs, pnnInputs = bid(deck, vulnerable, dealer, pos,
+                #print(" Playing for team: " + str(pos))
+                hbid, declarer, isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids = bid(deck, vulnerable, dealer, pos,
                                                        targetEnnModel, targetPnnModel,
                                                        opponentEnnModel, opponentPnnModel)
                 declarerTeam = declarer%2
-                score = getDoubleDummyScore(hbid, declarer, isDoubled, vulnerable[declarerTeam], hands)
+                #print(" Declarer is: " + str(declarer))
+                #print(" Suit is: " + str(hbid % 5))
+                #print(" Bid is: " + str((hbid // 5) + 1))
+                if hbid == -1:
+                    score = 0
+                else:    
+                    score = getDoubleDummyScore(hbid, declarer, isDoubled, vulnerable[declarerTeam], hands)
+                #print('Hbid is ' + str(hbid) + ' with prob ' + str(pnnProbs) + ' and score is ' + str(score))
+                #print(" Score is: " + str(score))
+                if declarerTeam != pos:
+                    score = -score
+                #print(" Score for pos team is: " + str(score))
+                #print("score is: " + str(score))
+                #print(" Starting Bid Scores")
                 
                 for k in range(len(ennInputs)):
                     bidder = (dealer + k) % numPlayers
-                    bidderScore = score if bidder % 2 == declarer % 2 else 0 - score
+                    #print("     Bidder is: " + str(bidder))
+                    if bidder % 2 == pos:
+                        rewardArray = np.zeros((numBids))
+                        rewardArray[bids[k]] = score
+                        #if bidder % 2 == pos:
+                            #rewardArray[bids[k]] = score
+                        #else:
+                            #rewardArray[bids[k]] = -score
+                        #print("         Reward is: " + str(score))
+                        #print("         Prob of  is: " + str(pnnProbs[k]))
+                        pnnRewards.append(rewardArray)
+                        pnnInputValues.append(pnnInputs[k])
                     
-                    rValues.append(bidderScore)
-                    pnnInputValues.append(pnnInputs[k])
-                    
-                    cardValues.append(hands[bidder])
-                    ennInputValues.append(ennInputs[k])
-                
+                        cardValues.append(hands[(bidder + 2) % numPlayers])
+                        ennInputValues.append(ennInputs[k])
+                                        
         npEnnInputValues = np.array(ennInputValues)
         npCardValues = np.array(cardValues)
         npPnnInputValues = np.array(pnnInputValues)
-        npRValues = np.array(rValues)
+        npPnnRewards = np.array(pnnRewards)
         
-        #print(npEnnInputValues.shape)
-        #print(npPnnInputValues.shape)
-        #print(npCardValues.shape)
-        #print(npRValues.shape)
+        #print('Starting loss calcs')
+        #test = kb.mean(kb.sum(kl.multiply([kb.constant(npPnnRewards), kb.log(kb.constant(targetPnnModel.predict(npPnnInputValues)))]), axis=-1))
+        #print(kb.eval(test))
         
-        targetEnnModel.fit(x=np.array(ennInputValues), y=np.array(cardValues))
-        targetPnnModel.fit(x=np.array(pnnInputValues), y=np.array(rValues))
+        targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
+        #should we shuffle?
+        targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
         
-        if i % 100 == 99:
+        if i % modelUpdateNum == modelUpdateNum - 1:
             updateEnnModel(targetEnnModel)
             updatePnnModel(targetPnnModel)
+            opponentEnnModel, opponentPnnModel = randomlySelectModels()
+            #opponentEnnModel = loadTargetEnnModel()
+            #opponentPnnModel = loadTargetPnnModel()
         
         
 
@@ -195,7 +224,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
     declarers = [-1, -1, -1, -1, -1]
     
     bidFeature = np.zeros((bidFeatureSize))
-    bids = np.zeros((numPlayers, bidFeatureSize))
+    playerBids = np.zeros((numPlayers, bidFeatureSize))
     oppVulnerable = np.flip(vulnerable)
         
     ###can we vectore this?
@@ -203,24 +232,25 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
     for i in range(numPlayers):
         hands[i, deck[i::numPlayers]] =  1
     
-    
-    ennInput = np.zeros((1, ennInputShape))
-    pnnInput = np.zeros((1, pnnInputShape))
-    
-    ennInputs = []
+    bids = []
+    pnnProbs = []
     pnnInputs = []
+    ennInputs = []
     while numPass < 3 and bidIndex < bidFeatureSize:
-
+        ennInput = np.zeros((1, ennInputShape))
+        pnnInput = np.zeros((1, pnnInputShape))
         ennInput[0, np.arange(deckSize)] = hands[bidder]
         ennInput[0, bidFeatureIndex:bidPartnerIndex] = bidFeature
-        ennInput[0, bidPartnerIndex:] = bids[bidder - 2 if bidder - 2 >= 0 else bidder + 2]
+        ennInput[0, bidPartnerIndex:] = playerBids[bidder - 2 if bidder - 2 >= 0 else bidder + 2]
         
         if (bidder % 2 == pos):
+            #print("Bidder is " + str(bidder) + " and is using target")
             ennInput[0, deckSize:bidFeatureIndex] = vulnerable
             pnnInput[0, deckSize:bidFeatureIndex] = vulnerable
             ennModelToUse = ennModel
             pnnModelToUse = pnnModel
         else:
+            #print("Bidder is " + str(bidder) + " and is NOT using target")
             ennInput[0, deckSize:bidFeatureIndex] = oppVulnerable
             pnnInput[0, deckSize:bidFeatureIndex] = oppVulnerable
             ennModelToUse = opponentEnnModel
@@ -230,12 +260,13 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         ennInputs.append(ennInput[0])
         
         ###Do we do this?
-        ennOutput[0, hands[bidder]] = 0
-        ennOutput[0] = ennOutput[0] / np.sum(ennOutput[0])
+        ennOutput[0, np.where(hands[bidder] == 1)] = 0
+        ###TAKING THIS OUT FOR NOW.  How do we normalize?
+        #ennOutput[0] = ennOutput[0] / np.sum(ennOutput[0])
         
         pnnInput[0, 0:deckSize] = hands[bidder]
         pnnInput[0, bidFeatureIndex:bidPartnerIndex] = bidFeature
-        pnnInput[0, bidPartnerIndex:ennOutputIndex] = bids[bidder - 2 if bidder - 2 >= 0 else bidder + 2]
+        pnnInput[0, bidPartnerIndex:ennOutputIndex] = playerBids[bidder - 2 if bidder - 2 >= 0 else bidder + 2]
         pnnInput[0, ennOutputIndex:] = ennOutput
         
         bidProbs = pnnModelToUse.predict(pnnInput)
@@ -244,15 +275,19 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         #need to mask illegal moves?
         legalMoves = getLegalMoves(highestBid, lastNonPassBid, teamToBid, lastTeamToBid)
         #make faster?
-        bidProbs[0] = np.multiply(bidProbs[0], legalMoves)
-        bidProbs[0] = bidProbs[0] / np.sum(bidProbs[0])
+        bidProbsNormalized = np.multiply(bidProbs[0], legalMoves)
+        bidProbsNormalized = bidProbsNormalized / np.sum(bidProbsNormalized)
         
         #can letter max this vectorize to do multiple predicts at same time
         #ie p=out[i]
-        bid = np.random.choice(numBids, p=bidProbs[0])
+        bid = np.random.choice(numBids, p=bidProbsNormalized)
+        #print('     bid is ' + str(bid) + ' with prob ' + str(bidProbs[0, bid]) + ' with norm prob ' + str(bidProbsNormalized[bid]))
+        bids.append(bid)
+        pnnProbs.append(bidProbs[0, bid])
         
         if bid == passBid:
             numPass = numPass + 1
+            #print("Bid is Pass")
         elif bid < doubleBid:
             numPass = 0
             highestBid = bid
@@ -261,19 +296,21 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
             lastTeamToBid = teamToBid
             if (declarers[bid % numBidSuits] == -1):
                 declarers[bid % numBidSuits] = bidder
+            #print("Bid is " + str((bid//5) + 1) + " of " + str(bid%5))
         else:
             numPass = 0
             lastNonPassBid = bid
             isDoubled = isDoubled + 1;
+            #print("Bid is (re)double")
             
         if numPass < 3:
+            bidIndex = getNextBidIndex(bid, bidIndex)
+            playerBids[bidder, bidIndex] = 1
             bidder = (bidder + 1) % numPlayers
             teamToBid = 1 - teamToBid
-            bidIndex = getNextBidIndex(bid, bidIndex)
             bidFeature[bidIndex] = 1
-            bids[bidder, bidIndex] = 1
         
-    return highestBid, declarers[highestBid % numBidSuits], isDoubled, hands, ennInputs, pnnInputs
+    return highestBid, declarers[highestBid % numBidSuits], isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids
 
 ###speed up by avoid np.zeros (take out)
 def getLegalMoves(highestBid, lastNonPassBid, teamToBid, lastTeamToBid):
@@ -314,9 +351,16 @@ def getNextPassIndex(currentBidIndex):
     if blockIndex == 8:
         return currentBidIndex + 2
     
+###Simplify if statements to greater or less
 def getNextDoubleIndex(currentBidIndex):
     blockIndex = (currentBidIndex - 3) % blockSize
-    return currentBidIndex + 3 - blockIndex
+    if blockIndex == 0 or blockIndex == 1 or blockIndex == 2:
+        return currentBidIndex + 3 - blockIndex
+    
+    if blockIndex == 3 or blockIndex == 4 or blockIndex == 5:
+        return currentBidIndex + 3 - (blockIndex - 3)
+    
+    print('ERROR ILLEGAL DOUBLE BID')
 
 def getNextBidIndex(bid, currentBidIndex):
     if bid < passBid:

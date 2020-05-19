@@ -15,12 +15,13 @@ void initialize() {
 }
 
 int calcScore(int bidSuit, int bidRank, int declarer, int isDoubled, int vulnerable, int* hand0, int* hand1, int* hand2, int* hand3) {
+
     int numTricksWon = numTricks(bidSuit, declarer, hand0, hand1, hand2, hand3);
-    
+
     if (numTricksWon == -1) {
         return -1;
     }
-    
+
     return calcDuplicateScore(bidSuit, bidRank, numTricksWon, isDoubled, vulnerable);
 }
 

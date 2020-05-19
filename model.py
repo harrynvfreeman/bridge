@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Add, Input, Dense
+from keras.layers import Add, Input, Dense, LeakyReLU
 from keras.optimizers import SGD
 #from keras import regularizers
 from loss import custom_loss_function
@@ -22,7 +22,8 @@ from keras import backend as kb
 ###https://stackoverflow.com/questions/55669699/keras-masking-output-layer
 
 #regConstant = 0.0001
-learningRate = 0.01
+pnnLearningRate = 0.001
+ennLearningRate = 0.01
 #momentum = 0.9
 
 cardShape = 52;
@@ -46,11 +47,12 @@ def layer(x, numLayers, hiddenLayerSize):
     a = x
     skip = False
     for i in range(numLayers):
-        b = Dense(hiddenLayerSize, activation='relu')(a)
+        b = Dense(hiddenLayerSize)(a)
+        c = LeakyReLU()(b)
         if (skip):
-            a = Add()([a, b])
+            a = Add()([a, c])
         else:
-            a = b
+            a = c
         skip = not skip
 
     return a
@@ -64,7 +66,7 @@ def buildEnnModel():
     ennInput = Input(shape=(ennInputShape, ))
     ennOutput = buildEnn(ennInput)
     ennModel = Model(inputs = [ennInput], outputs = [ennOutput])
-    ennModel.compile(optimizer=SGD(lr=learningRate), loss='binary_crossentropy')
+    ennModel.compile(optimizer=SGD(lr=ennLearningRate), loss='binary_crossentropy')
     return ennModel
     
     
@@ -77,7 +79,7 @@ def buildPnnModel():
     pnnInput = Input(shape=(pnnInputShape, ))
     pnnOutput = buildPnn(pnnInput)
     pnnModel = Model(inputs = [pnnInput], outputs = [pnnOutput])
-    pnnModel.compile(optimizer=SGD(lr=learningRate), loss=custom_loss_function)
+    pnnModel.compile(optimizer=SGD(lr=pnnLearningRate, clipnorm=1), loss=custom_loss_function)
     return pnnModel
 
 def buildModels():
