@@ -1,9 +1,9 @@
-from keras.models import Model
-from keras.layers import Add, Input, Dense, LeakyReLU
-from keras.optimizers import SGD
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Add, Input, Dense, LeakyReLU
+from tensorflow.keras.optimizers import SGD
 #from keras import regularizers
 from loss import custom_loss_function
-from keras import backend as kb
+from tensorflow.keras import backend as kb
 
 ###Do I want to limit activation function?  See Relu keras
 ###https://keras.io/api/layers/activation_layers/
@@ -22,7 +22,7 @@ from keras import backend as kb
 ###https://stackoverflow.com/questions/55669699/keras-masking-output-layer
 
 #regConstant = 0.0001
-pnnLearningRate = 0.001
+pnnLearningRate = 0.0001
 ennLearningRate = 0.01
 #momentum = 0.9
 
@@ -79,8 +79,5 @@ def buildPnnModel():
     pnnInput = Input(shape=(pnnInputShape, ))
     pnnOutput = buildPnn(pnnInput)
     pnnModel = Model(inputs = [pnnInput], outputs = [pnnOutput])
-    pnnModel.compile(optimizer=SGD(lr=pnnLearningRate, clipnorm=1), loss=custom_loss_function)
+    pnnModel.compile(optimizer=SGD(lr=pnnLearningRate, clipnorm=2), loss=custom_loss_function)
     return pnnModel
-
-def buildModels():
-    return buildEnnModel(), buildPnnModel()

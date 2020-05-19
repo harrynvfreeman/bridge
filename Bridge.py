@@ -1,14 +1,12 @@
 import numpy as np
-import keras
-from model import buildModels
+import tensorflow.keras as keras
+import model
 from pickle import dump, load
 import os
 import ctypes
 import pathlib
-import keras.backend as kb
-import keras.layers as kl
 from loss import custom_loss_function
-from keras.optimizers import SGD
+from tensorflow.keras.optimizers import SGD
 
 deckSize = 52
 vulnSize = 2
@@ -33,7 +31,7 @@ blockSize = 9
 numBidSuits = 5
 
 miniBatchSize = 100
-modelUpdateNum = 40
+modelUpdateNum = 100
 
 rng = np.random.default_rng()
 
@@ -47,31 +45,41 @@ c_lib.calcScore.argtypes = [ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_i
 c_lib.calcScore.restype = ctypes.c_int
 c_lib.initialize()
 
-def saveInitialModels():
-    ennModel, pnnModel = buildModels()
-    ennVersion = 0
-    pnnVersion = 0
-    ennModel.save(ennSavePath + str(ennVersion) + '.h5')
-    pnnModel.save(pnnSavePath + str(pnnVersion) + '.h5')
-    dump(ennVersion, open(ennVersionPath, 'wb'))
-    dump(pnnVersion, open(pnnVersionPath, 'wb'))
+def loadTargetEnnModel():
+    try:
+        ennVersion = load(open(ennVersionPath, 'rb'))
+        modelPath = ennSavePath + str(ennVersion) + '.h5'
+        return keras.models.load_model(modelPath)
+    except FileNotFoundError:
+        return model.buildEnnModel()
     
 def updateEnnModel(ennModel):
-    ennVersion = load(open(ennVersionPath, 'rb'))
+    try:
+        ennVersion = load(open(ennVersionPath, 'rb'))
+    except FileNotFoundError:
+        ennVersion = -1
+        
     if (ennVersion >= numModelsToSave):
         modelPathToDelete = ennSavePath + str(ennVersion - numModelsToSave) + '.h5'
         os.remove(modelPathToDelete)
     ennVersion = ennVersion + 1
     ennModel.save(ennSavePath + str(ennVersion) + '.h5')
     dump(ennVersion, open(ennVersionPath, 'wb'))
-
-def loadTargetEnnModel():
-    ennVersion = load(open(ennVersionPath, 'rb'))
-    modelPath = ennSavePath + str(ennVersion) + '.h5'
-    return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
+    
+def loadTargetPnnModel():
+    try:
+        pnnVersion = load(open(pnnVersionPath, 'rb'))
+        modelPath = pnnSavePath + str(pnnVersion) + '.h5'
+        return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
+    except FileNotFoundError:
+        return model.buildPnnModel()
 
 def updatePnnModel(pnnModel):
-    pnnVersion = load(open(pnnVersionPath, 'rb'))
+    try:
+        pnnVersion = load(open(pnnVersionPath, 'rb'))
+    except FileNotFoundError:
+        pnnVersion = -1
+        
     if (pnnVersion >= numModelsToSave):
         modelPathToDelete = pnnSavePath + str(pnnVersion - numModelsToSave) + '.h5'
         os.remove(modelPathToDelete)
@@ -79,21 +87,21 @@ def updatePnnModel(pnnModel):
     pnnModel.save(pnnSavePath + str(pnnVersion) + '.h5')
     dump(pnnVersion, open(pnnVersionPath, 'wb'))
 
-def loadTargetPnnModel():
-    pnnVersion = load(open(pnnVersionPath, 'rb'))
-    modelPath = pnnSavePath + str(pnnVersion) + '.h5'
-    return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
-
 def randomlySelectModels():
-    version = load(open(ennVersionPath, 'rb'))
+    try:
+        version = load(open(ennVersionPath, 'rb'))
+    except FileNotFoundError:
+        print('Playing against radom version')
+        return model.buildEnnModel(), model.buildPnnModel()
+    
     if version >= numModelsToSave:
         randVersion = np.random.randint(version - numModelsToSave + 1, version)
     else:
         randVersion = np.random.randint(0, version + 1)
-        
+    print('Playing against version: ' + str(randVersion))
     ennModelPath = ennSavePath + str(randVersion) + '.h5'
     pnnModelPath = pnnSavePath + str(randVersion) + '.h5'
-    ennModel = keras.models.load_model(ennModelPath, custom_objects={'custom_loss_function': custom_loss_function})
+    ennModel = keras.models.load_model(ennModelPath)
     pnnModel = keras.models.load_model(pnnModelPath, custom_objects={'custom_loss_function': custom_loss_function})
     return ennModel, pnnModel
 
@@ -123,11 +131,11 @@ def selfPlay(decks, vulnerables, dealers):
     
     targetEnnModel = loadTargetEnnModel()
     
-    targetEnnModel.compile(optimizer=SGD(lr=0.1), loss='binary_crossentropy')
+    #targetEnnModel.compile(optimizer=SGD(lr=0.1), loss='binary_crossentropy')
     
     targetPnnModel = loadTargetPnnModel()
     
-    targetPnnModel.compile(optimizer=SGD(lr=0.1, clipnorm=2), loss=custom_loss_function)
+    #targetPnnModel.compile(optimizer=SGD(lr=0.1, clipnorm=2), loss=custom_loss_function)
     
     opponentEnnModel, opponentPnnModel = randomlySelectModels()
     #opponentEnnModel = loadTargetEnnModel()

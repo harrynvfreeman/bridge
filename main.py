@@ -1,11 +1,9 @@
 import Bridge as b
 import model as m
 import numpy as np
-import keras.backend as kb
-import keras.layers as kl
 
 def train():
-    decks, vulnerables, dealers = b.generateRandomGames(4000)
+    decks, vulnerables, dealers = b.generateRandomGames(100000)
     b.selfPlay(decks, vulnerables, dealers)
 
 def test():
@@ -22,8 +20,8 @@ def test():
     score = b.getDoubleDummyScore(hbid, declarer, isDoubled, 0, hands)
     print('Score is: ' + str(score))
 
-#train()
-test()
+train()
+#test()
 
 # targetPnnModel = m.buildPnnModel()
 # bidSequence = np.zeros((1, b.pnnInputShape))
