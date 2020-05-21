@@ -6,6 +6,7 @@ import os
 import ctypes
 import pathlib
 from loss import custom_loss_function
+import random
 from tensorflow.keras.optimizers import SGD
 
 deckSize = 52
@@ -32,6 +33,8 @@ numBidSuits = 5
 
 miniBatchSize = 100
 modelUpdateNum = 100
+
+forceFirstBidProb = 0.25
 
 rng = np.random.default_rng()
 
@@ -206,7 +209,7 @@ def selfPlay(decks, vulnerables, dealers):
         #print('Starting loss calcs')
         #test = kb.mean(kb.sum(kl.multiply([kb.constant(npPnnRewards), kb.log(kb.constant(targetPnnModel.predict(npPnnInputValues)))]), axis=-1))
         #print(kb.eval(test))
-        
+        print(npEnnInputValues.shape)
         targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
         #should we shuffle?
         targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
@@ -282,6 +285,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         
         #need to mask illegal moves?
         legalMoves = getLegalMoves(highestBid, lastNonPassBid, teamToBid, lastTeamToBid)
+            
         #make faster?
         bidProbsNormalized = np.multiply(bidProbs[0], legalMoves)
         bidProbsNormalized = bidProbsNormalized / np.sum(bidProbsNormalized)
@@ -289,6 +293,14 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         #can letter max this vectorize to do multiple predicts at same time
         #ie p=out[i]
         bid = np.random.choice(numBids, p=bidProbsNormalized)
+        if (bidIndex < 3 and bid == passBid and random.random() < forceFirstBidProb):
+            print('Forcing bid not too pass')
+            legalMoves[passBid] = 0
+            legalMoves[5:] = 0
+            bidProbsNormalized = np.multiply(bidProbs[0], legalMoves)
+            bidProbsNormalized = bidProbsNormalized / np.sum(bidProbsNormalized)
+            bid = np.random.choice(numBids, p=bidProbsNormalized)
+        
         #print('     bid is ' + str(bid) + ' with prob ' + str(bidProbs[0, bid]) + ' with norm prob ' + str(bidProbsNormalized[bid]))
         bids.append(bid)
         pnnProbs.append(bidProbs[0, bid])
