@@ -44,11 +44,11 @@ class BridgeState:
 
 def save(version, index, bridgeState):
     if bridgeState.score == 0:
-        path = savePath + str(version) + '/draw/state_' + index
+        path = savePath + str(version) + '/draw/state_' + str(index)
     elif bridgeState.score > 0:
-        path = savePath + str(version) + '/win/state_' + index
+        path = savePath + str(version) + '/win/state_' + str(index)
     else:
-        path = savePath + str(version) + '/loss/state_' + index
+        path = savePath + str(version) + '/loss/state_' + str(index)
         
     os.makedirs(os.path.dirname(path), exist_ok=True)
     dump(bridgeState, open(path, 'wb'))
