@@ -1,6 +1,9 @@
 import Bridge
 import numpy as np
 
+###WARNING WARNING WARNING
+###Might fail since I forced a bid to prevent passing, set forceFirstBidProb to 1
+
 def bidTestAllPass():
     deck = np.arange(52)
     vulnerable = np.array([0, 1])

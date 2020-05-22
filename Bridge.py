@@ -8,6 +8,7 @@ import pathlib
 from loss import custom_loss_function
 import random
 from tensorflow.keras.optimizers import SGD
+import BridgeState
 
 deckSize = 52
 vulnSize = 2
@@ -52,9 +53,9 @@ def loadTargetEnnModel():
     try:
         ennVersion = load(open(ennVersionPath, 'rb'))
         modelPath = ennSavePath + str(ennVersion) + '.h5'
-        return keras.models.load_model(modelPath)
+        return keras.models.load_model(modelPath), ennVersion + 1
     except FileNotFoundError:
-        return model.buildEnnModel()
+        return model.buildEnnModel(), 0
     
 def updateEnnModel(ennModel):
     try:
@@ -73,9 +74,9 @@ def loadTargetPnnModel():
     try:
         pnnVersion = load(open(pnnVersionPath, 'rb'))
         modelPath = pnnSavePath + str(pnnVersion) + '.h5'
-        return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function})
+        return keras.models.load_model(modelPath, custom_objects={'custom_loss_function': custom_loss_function}), pnnVersion + 1
     except FileNotFoundError:
-        return model.buildPnnModel()
+        return model.buildPnnModel(), 0
 
 def updatePnnModel(pnnModel):
     try:
@@ -94,7 +95,7 @@ def randomlySelectModels():
     try:
         version = load(open(ennVersionPath, 'rb'))
     except FileNotFoundError:
-        print('Playing against radom version')
+        print('Playing against random version')
         return model.buildEnnModel(), model.buildPnnModel()
     
     if version >= numModelsToSave:
@@ -132,19 +133,11 @@ def generateRandomGames(numGames):
 def selfPlay(decks, vulnerables, dealers):
     numMiniBatches = decks.shape[0] // miniBatchSize
     
-    targetEnnModel = loadTargetEnnModel()
-    
-    #targetEnnModel.compile(optimizer=SGD(lr=0.1), loss='binary_crossentropy')
-    
-    targetPnnModel = loadTargetPnnModel()
-    
-    #targetPnnModel.compile(optimizer=SGD(lr=0.1, clipnorm=2), loss=custom_loss_function)
+    targetEnnModel, version = loadTargetEnnModel()    
+    targetPnnModel, version = loadTargetPnnModel()
     
     opponentEnnModel, opponentPnnModel = randomlySelectModels()
-    #opponentEnnModel = loadTargetEnnModel()
-    #opponentPnnModel = loadTargetPnnModel()
     
-    #numMiniBatches
     for i in range(numMiniBatches):
         
         #pnn
@@ -155,52 +148,47 @@ def selfPlay(decks, vulnerables, dealers):
         cardValues = []
         ennInputValues = []
         
-        #miniBatchSize
+        bridgeStateIndex = 0;
         for j in range(miniBatchSize):
             index = i*miniBatchSize + j
             deck = decks[index]
             vulnerable = vulnerables[index]
             dealer = dealers[index, 0]
-            #print("Dealer is: " + str(dealer))
+            
             for pos in range(2):
-                #print(" Playing for team: " + str(pos))
-                hbid, declarer, isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids = bid(deck, vulnerable, dealer, pos,
+                
+                hbid, declarer, isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids, wasForced, declarers = bid(deck, vulnerable,
+                                                       dealer, pos,
                                                        targetEnnModel, targetPnnModel,
                                                        opponentEnnModel, opponentPnnModel)
                 declarerTeam = declarer%2
-                #print(" Declarer is: " + str(declarer))
-                #print(" Suit is: " + str(hbid % 5))
-                #print(" Bid is: " + str((hbid // 5) + 1))
                 if hbid == -1:
                     score = 0
                 else:    
                     score = getDoubleDummyScore(hbid, declarer, isDoubled, vulnerable[declarerTeam], hands)
-                #print('Hbid is ' + str(hbid) + ' with prob ' + str(pnnProbs) + ' and score is ' + str(score))
-                #print(" Score is: " + str(score))
+
                 if declarerTeam != pos:
                     score = -score
-                #print(" Score for pos team is: " + str(score))
-                #print("score is: " + str(score))
-                #print(" Starting Bid Scores")
                 
+                #ADD WOULD BE SCORES HERE
                 for k in range(len(ennInputs)):
                     bidder = (dealer + k) % numPlayers
-                    #print("     Bidder is: " + str(bidder))
                     if bidder % 2 == pos:
                         rewardArray = np.zeros((numBids))
                         rewardArray[bids[k]] = score
-                        #if bidder % 2 == pos:
-                            #rewardArray[bids[k]] = score
-                        #else:
-                            #rewardArray[bids[k]] = -score
-                        #print("         Reward is: " + str(score))
-                        #print("         Prob of  is: " + str(pnnProbs[k]))
                         pnnRewards.append(rewardArray)
                         pnnInputValues.append(pnnInputs[k])
                     
                         cardValues.append(hands[(bidder + 2) % numPlayers])
                         ennInputValues.append(ennInputs[k])
-                                        
+                
+                bridgeState = BridgeState.BridgeState(hbid, declarer, isDoubled, hands, deck, bids, wasForced, pnnProbs,
+                                                      dealer, vulnerable, pos, score,
+                                                      pnnInputs, rewardArray, ennInputs, hands[(bidder + 2) % numPlayers],
+                                                      declarers)
+                BridgeState.save(version, bridgeStateIndex, bridgeState)
+                bridgeStateIndex = bridgeStateIndex + 1
+                
         npEnnInputValues = np.array(ennInputValues)
         npCardValues = np.array(cardValues)
         npPnnInputValues = np.array(pnnInputValues)
@@ -211,15 +199,13 @@ def selfPlay(decks, vulnerables, dealers):
         #print(kb.eval(test))
         print(npEnnInputValues.shape)
         targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
-        #should we shuffle?
         targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
         
         if i % modelUpdateNum == modelUpdateNum - 1:
             updateEnnModel(targetEnnModel)
             updatePnnModel(targetPnnModel)
+            bridgeStateIndex = 0
             opponentEnnModel, opponentPnnModel = randomlySelectModels()
-            #opponentEnnModel = loadTargetEnnModel()
-            #opponentPnnModel = loadTargetPnnModel()
         
         
 
@@ -232,7 +218,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
     lastNonPassBid = -1
     lastTeamToBid = -1
     teamToBid = bidder % 2
-    declarers = [-1, -1, -1, -1, -1]
+    declarers = [[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1]]
     
     bidFeature = np.zeros((bidFeatureSize))
     playerBids = np.zeros((numPlayers, bidFeatureSize))
@@ -255,13 +241,11 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         ennInput[0, bidPartnerIndex:] = playerBids[bidder - 2 if bidder - 2 >= 0 else bidder + 2]
         
         if (bidder % 2 == pos):
-            #print("Bidder is " + str(bidder) + " and is using target")
             ennInput[0, deckSize:bidFeatureIndex] = vulnerable
             pnnInput[0, deckSize:bidFeatureIndex] = vulnerable
             ennModelToUse = ennModel
             pnnModelToUse = pnnModel
         else:
-            #print("Bidder is " + str(bidder) + " and is NOT using target")
             ennInput[0, deckSize:bidFeatureIndex] = oppVulnerable
             pnnInput[0, deckSize:bidFeatureIndex] = oppVulnerable
             ennModelToUse = opponentEnnModel
@@ -270,10 +254,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         ennOutput = ennModelToUse.predict(ennInput)
         ennInputs.append(ennInput[0])
         
-        ###Do we do this?
         ennOutput[0, np.where(hands[bidder] == 1)] = 0
-        ###TAKING THIS OUT FOR NOW.  How do we normalize?
-        #ennOutput[0] = ennOutput[0] / np.sum(ennOutput[0])
         
         pnnInput[0, 0:deckSize] = hands[bidder]
         pnnInput[0, bidFeatureIndex:bidPartnerIndex] = bidFeature
@@ -294,34 +275,32 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         #ie p=out[i]
         bid = np.random.choice(numBids, p=bidProbsNormalized)
         if (bidIndex < 3 and bid == passBid and random.random() < forceFirstBidProb):
-            print('Forcing bid not too pass')
+            wasForced = True
             legalMoves[passBid] = 0
             legalMoves[5:] = 0
             bidProbsNormalized = np.multiply(bidProbs[0], legalMoves)
             bidProbsNormalized = bidProbsNormalized / np.sum(bidProbsNormalized)
             bid = np.random.choice(numBids, p=bidProbsNormalized)
+        elif (bidIndex < 3):
+            wasForced = False
         
-        #print('     bid is ' + str(bid) + ' with prob ' + str(bidProbs[0, bid]) + ' with norm prob ' + str(bidProbsNormalized[bid]))
         bids.append(bid)
         pnnProbs.append(bidProbs[0, bid])
         
         if bid == passBid:
             numPass = numPass + 1
-            #print("Bid is Pass")
         elif bid < doubleBid:
             numPass = 0
             highestBid = bid
             isDoubled = 0;
             lastNonPassBid = bid
             lastTeamToBid = teamToBid
-            if (declarers[bid % numBidSuits] == -1):
-                declarers[bid % numBidSuits] = bidder
-            #print("Bid is " + str((bid//5) + 1) + " of " + str(bid%5))
+            if (declarers[lastTeamToBid][bid % numBidSuits] == -1):
+                declarers[lastTeamToBid][bid % numBidSuits] = bidder
         else:
             numPass = 0
             lastNonPassBid = bid
             isDoubled = isDoubled + 1;
-            #print("Bid is (re)double")
             
         if numPass < 3:
             bidIndex = getNextBidIndex(bid, bidIndex)
@@ -330,7 +309,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
             teamToBid = 1 - teamToBid
             bidFeature[bidIndex] = 1
         
-    return highestBid, declarers[highestBid % numBidSuits], isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids
+    return highestBid, declarers[lastTeamToBid][highestBid % numBidSuits], isDoubled, hands, ennInputs, pnnInputs, pnnProbs, bids, wasForced, declarers
 
 ###speed up by avoid np.zeros (take out)
 def getLegalMoves(highestBid, lastNonPassBid, teamToBid, lastTeamToBid):
