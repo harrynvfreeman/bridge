@@ -35,7 +35,8 @@ numBidSuits = 5
 miniBatchSize = 100
 modelUpdateNum = 100
 
-forceFirstBidProb = 0.25
+#forceFirstBidProb = 0.25
+forceFirstBidProb = -1
 
 rng = np.random.default_rng()
 
@@ -69,6 +70,7 @@ def updateEnnModel(ennModel):
     ennVersion = ennVersion + 1
     ennModel.save(ennSavePath + str(ennVersion) + '.h5')
     dump(ennVersion, open(ennVersionPath, 'wb'))
+    return ennVersion
     
 def loadTargetPnnModel():
     try:
@@ -90,6 +92,7 @@ def updatePnnModel(pnnModel):
     pnnVersion = pnnVersion + 1
     pnnModel.save(pnnSavePath + str(pnnVersion) + '.h5')
     dump(pnnVersion, open(pnnVersionPath, 'wb'))
+    return pnnVersion
 
 def randomlySelectModels():
     try:
@@ -136,6 +139,8 @@ def selfPlay(decks, vulnerables, dealers):
     targetEnnModel, version = loadTargetEnnModel()    
     targetPnnModel, version = loadTargetPnnModel()
     
+    logCount = 0
+    
     opponentEnnModel, opponentPnnModel = randomlySelectModels()
     
     for i in range(numMiniBatches):
@@ -171,20 +176,24 @@ def selfPlay(decks, vulnerables, dealers):
                     score = -score
                 
                 #ADD WOULD BE SCORES HERE
+                stateRewardArrays = []
+                stateCardValueArrays = []
                 for k in range(len(ennInputs)):
                     bidder = (dealer + k) % numPlayers
                     if bidder % 2 == pos:
                         rewardArray = np.zeros((numBids))
                         rewardArray[bids[k]] = score
+                        stateRewardArrays.append(rewardArray)
                         pnnRewards.append(rewardArray)
                         pnnInputValues.append(pnnInputs[k])
                     
                         cardValues.append(hands[(bidder + 2) % numPlayers])
+                        stateCardValueArrays.append(hands[(bidder + 2) % numPlayers])
                         ennInputValues.append(ennInputs[k])
                 
                 bridgeState = BridgeState.BridgeState(hbid, declarer, isDoubled, hands, deck, bids, wasForced, pnnProbs,
                                                       dealer, vulnerable, pos, score,
-                                                      pnnInputs, rewardArray, ennInputs, hands[(bidder + 2) % numPlayers],
+                                                      pnnInputs, stateRewardArrays, ennInputs, stateCardValueArrays,
                                                       declarers)
                 BridgeState.save(version, bridgeStateIndex, bridgeState)
                 bridgeStateIndex = bridgeStateIndex + 1
@@ -198,12 +207,14 @@ def selfPlay(decks, vulnerables, dealers):
         #test = kb.mean(kb.sum(kl.multiply([kb.constant(npPnnRewards), kb.log(kb.constant(targetPnnModel.predict(npPnnInputValues)))]), axis=-1))
         #print(kb.eval(test))
         print(npEnnInputValues.shape)
+        print('Training ' + str(logCount))
         targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
         targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
         
         if i % modelUpdateNum == modelUpdateNum - 1:
-            updateEnnModel(targetEnnModel)
-            updatePnnModel(targetPnnModel)
+            version = updateEnnModel(targetEnnModel)
+            version = updatePnnModel(targetPnnModel)
+            logCount = 0
             bridgeStateIndex = 0
             opponentEnnModel, opponentPnnModel = randomlySelectModels()
         
