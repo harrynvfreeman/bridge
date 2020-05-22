@@ -102,9 +102,13 @@ def randomlySelectModels():
         return model.buildEnnModel(), model.buildPnnModel()
     
     if version >= numModelsToSave:
-        randVersion = np.random.randint(version - numModelsToSave + 1, version)
+        randVersion = np.random.randint(version - numModelsToSave + 1, version + 1)
     else:
         randVersion = np.random.randint(0, version + 1)
+        
+    ###Take out below for random
+    randVersion = version
+    
     print('Playing against version: ' + str(randVersion))
     ennModelPath = ennSavePath + str(randVersion) + '.h5'
     pnnModelPath = pnnSavePath + str(randVersion) + '.h5'
