@@ -35,8 +35,8 @@ numBidSuits = 5
 miniBatchSize = 100
 modelUpdateNum = 100
 
-#forceFirstBidProb = 0.25
-forceFirstBidProb = -1
+forceFirstBidProb = 0.30
+#forceFirstBidProb = -1
 
 rng = np.random.default_rng()
 
@@ -144,6 +144,7 @@ def selfPlay(decks, vulnerables, dealers):
     targetPnnModel, version = loadTargetPnnModel()
     
     logCount = 0
+    bridgeStateIndex = 0;
     
     opponentEnnModel, opponentPnnModel = randomlySelectModels()
     
@@ -157,7 +158,6 @@ def selfPlay(decks, vulnerables, dealers):
         cardValues = []
         ennInputValues = []
         
-        bridgeStateIndex = 0;
         for j in range(miniBatchSize):
             index = i*miniBatchSize + j
             deck = decks[index]
@@ -184,7 +184,7 @@ def selfPlay(decks, vulnerables, dealers):
                 stateCardValueArrays = []
                 for k in range(len(ennInputs)):
                     bidder = (dealer + k) % numPlayers
-                    if bidder % 2 == pos:
+                    if bidder % 2 == pos and score != 0:
                         rewardArray = np.zeros((numBids))
                         rewardArray[bids[k]] = score
                         stateRewardArrays.append(rewardArray)
@@ -211,9 +211,13 @@ def selfPlay(decks, vulnerables, dealers):
         #test = kb.mean(kb.sum(kl.multiply([kb.constant(npPnnRewards), kb.log(kb.constant(targetPnnModel.predict(npPnnInputValues)))]), axis=-1))
         #print(kb.eval(test))
         print(npEnnInputValues.shape)
-        print('Training ' + str(logCount))
-        targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
-        targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
+        if (npEnnInputValues.shape[0] > 0):
+            print('Training ' + str(logCount))
+            targetEnnModel.fit(x=npEnnInputValues, y=npCardValues, batch_size=128)
+            targetPnnModel.fit(x=npPnnInputValues, y=npPnnRewards, batch_size=128)
+        else:
+            print('Not Training ' + str(logCount))
+        logCount = logCount + 1
         
         if i % modelUpdateNum == modelUpdateNum - 1:
             version = updateEnnModel(targetEnnModel)
@@ -289,7 +293,7 @@ def bid(deck, vulnerable, dealer, pos, ennModel, pnnModel, opponentEnnModel, opp
         #can letter max this vectorize to do multiple predicts at same time
         #ie p=out[i]
         bid = np.random.choice(numBids, p=bidProbsNormalized)
-        if (bidIndex < 3 and bid == passBid and random.random() < forceFirstBidProb):
+        if (bidIndex < 3 and bid == passBid and bidder % 2 != pos and random.random() < forceFirstBidProb):
             wasForced = True
             legalMoves[passBid] = 0
             legalMoves[5:] = 0

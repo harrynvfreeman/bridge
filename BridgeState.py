@@ -21,6 +21,11 @@ savePath = ('./bridgeStates/')
 # 36 - double
 # 37 - redouble
 
+#Ideas to improve:
+#Instead of using the same score, use calc dds for each bid to determine what the score
+#would have been for that bid.  Slower, but might prevent all passing
+#do not train if score is 0
+
 class BridgeState:
     def __init__(self, hbid, declarer, isDoubled, hands, deck, bids, wasForced, pnnProbs, dealer, vulnerable, pos, score,
                  pnnInputs, rewardArray, ennInputs, cardValues, declarers):
