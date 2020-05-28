@@ -23,8 +23,12 @@ savePath = ('./bridgeStates/')
 
 #Ideas to improve:
 #Instead of using the same score, use calc dds for each bid to determine what the score
-#would have been for that bid.  Slower, but might prevent all passing
-#do not train if score is 0
+#   would have been for that bid.  Slower, but might prevent all passing
+#   Could also set to 0 if that bid would have won and the loss score if loss
+#Need to check if weights earlier in models are being updated
+#Scale earlier bids to be less bad
+#Parallel calcDDTables
+
 
 class BridgeState:
     def __init__(self, hbid, declarer, isDoubled, hands, deck, bids, wasForced, pnnProbs, dealer, vulnerable, pos, score,

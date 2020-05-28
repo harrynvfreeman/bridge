@@ -48,6 +48,38 @@ int numTricks(int bidSuit, int declarer, int* hand0, int* hand1, int* hand2, int
     return tableResults.resTable[ddsBidSuit][declarer];
 }
 
+void getMaxTricks(int* hand0, int* hand1, int* hand2, int* hand3, int* result) {
+    ddTableDeal tableDeal;
+    ddTableResults tableResults;
+    int res;
+    
+    convertHand(hand0, 0, &tableDeal);
+    convertHand(hand1, 1, &tableDeal);
+    convertHand(hand2, 2, &tableDeal);
+    convertHand(hand3, 3, &tableDeal);
+    
+    res = CalcDDtable(tableDeal, &tableResults);
+    
+    if (res != RETURN_NO_FAULT)
+    {
+      printf("DDS error\n");
+      for (int i = 0; i < 20; i++) {
+        *(result + i) = -1;
+      }
+      return;
+    }
+    
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            *(result + 4*i + j) = tableResults.resTable[3 - i][j];
+        }
+    }
+    
+    for (int i = 0; i < 4; i++) {
+        *(result + 16 + i) = tableResults.resTable[4][i];
+    }
+}
+
 void convertHand(int * hand, int position, ddTableDeal * tableDeal) {
     unsigned int clubs = 0;
     unsigned int diamonds = 0;
