@@ -32,6 +32,7 @@ doubleBid = 36
 redoubleBid = 37
 blockSize = 9
 numBidSuits = 5
+bidOffset = 6
 
 miniBatchSize = 100
 modelUpdateNum = 100
@@ -394,7 +395,7 @@ def bidParallel(numBidSequences, decks, vulnerables, dealers, positions, targetE
                     legalMoves[:] = 0
                     canForceBid = False
                     for j in range(numBidSuits):
-                        maxSuitTrick = maxTricks[bidders[i], j]
+                        maxSuitTrick = maxTricks[bidders[i], j] - bidOffset
                         for k in range(min(maxSuitTrick, highestForceRank)):
                             legalMoves[j + numBidSuits*k] = 1
                             canForceBid = True
